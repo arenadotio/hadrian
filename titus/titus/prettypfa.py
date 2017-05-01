@@ -3,7 +3,7 @@
 # Copyright (C) 2014  Open Data ("Open Data" refers to
 # one or more of the following companies: Open Data Partners LLC,
 # Open Data Research LLC, or Open Data Capital LLC.)
-# 
+#
 # This file is part of Hadrian.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -378,15 +378,15 @@ class MiniGet(MiniAst):
 
 class MiniTo(MiniAst):
     """Mini-AST element representing an attr-to, cell-to, or pool-to."""
-    def __init__(self, name, args, direct, to, init, low, high):
+    def __init__(self, name, args, direct, to_, init, low, high):
         self.name = name
         self.args = args
         self.direct = direct
-        self.to = to
+        self.to_ = to_
         self.init = init
         super(MiniTo, self).__init__(low, high)
     def __repr__(self):
-        return "MiniTo({0}, {1}, {2}, {3}, {4})".format(self.name, self.args, self.direct, self.to, self.init)
+        return "MiniTo({0}, {1}, {2}, {3}, {4})".format(self.name, self.args, self.direct, self.to_, self.init)
     def asExpr(self, state):
         if "." in self.name:
             pieces = self.name.split(".")
@@ -396,15 +396,15 @@ class MiniTo(MiniAst):
             base = self.name
             path = [x.asExpr(state) for x in self.args]
 
-        to = self.to.asExpr(state)
+        to_ = self.to_.asExpr(state)
         if self.direct:
-            if isinstance(to, FcnRef):
-                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to.name, to.pos))
-            elif isinstance(to, (FcnDef, FcnRefFill)):
-                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to, to.pos))
+            if isinstance(to_, FcnRef):
+                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to_.name, to_.pos))
+            elif isinstance(to_, (FcnDef, FcnRefFill)):
+                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to_, to_.pos))
         else:
             if not isinstance(to, (FcnRef, FcnDef, FcnRefFill)):
-                raise PrettyPfaException("indirect assignments (with a \"to\" keyword) must refer to functions, not {0} at {1}".format(to, to.pos))
+                raise PrettyPfaException("indirect assignments (with a \"to\" keyword) must refer to functions, not {0} at {1}".format(to_, to_.pos))
             if base in state.poolNames:
                 if self.init is None:
                     raise PrettyPfaException("indirect pool assignments (with a \"to\" keyword) must also have an \"init\" at {0}".format(self.pos))
@@ -414,15 +414,15 @@ class MiniTo(MiniAst):
                 raise PrettyPfaException("non-pool assignments must not have an \"init\" at {0}".format(self.pos))
 
         if base in state.cellNames:
-            return CellTo(base, path, to, self.pos)
+            return CellTo(base, path, to_, self.pos)
         elif base in state.poolNames:
             if self.init is None:
-                init = self.to.asExpr(state)
+                init = self.to_.asExpr(state)
             else:
                 init = self.init.asExpr(state)
-            return PoolTo(base, path, to, init, self.pos)
+            return PoolTo(base, path, to_, init, self.pos)
         else:
-            return AttrTo(Ref(base, self.pos), path, to, self.pos)
+            return AttrTo(Ref(base, self.pos), path, to_, self.pos)
 
 class MiniEnumSymbol(MiniAst):
     """Mini-AST element representing an enumeration symbol."""
@@ -624,7 +624,7 @@ class MiniCall(MiniAst):
             if len(self.args) < 1 or not all(isinstance(x, MiniParam) for x in self.args):
                 raise PrettyPfaException("pack function requires at least one argument and all arguments must be format-expression pairs")
             return Pack([(x.name, x.typeExpr.asExpr(state)) for x in self.args], self.pos)
-            
+
         elif self.name == "doc":
             if len(self.args) != 1:
                 raise PrettyPfaException("doc function has only 1 argument, not {0}, at {1}".format(len(self.args), self.pos))
@@ -1137,35 +1137,35 @@ class MiniAssignment(MiniAst):
             base = pieces[0]
             path = [LiteralString(x, self.pos) for x in pieces[1:]]
 
-            to = self.pairs.values()[0].asExpr(state)
-            if isinstance(to, FcnRef):
-                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to.name, to.pos))
-            elif isinstance(to, FcnDef):
-                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to, to.pos))
+            to_ = self.pairs.values()[0].asExpr(state)
+            if isinstance(to_, FcnRef):
+                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to_.name, to_.pos))
+            elif isinstance(to_, FcnDef):
+                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to_, to_.pos))
 
             if base in state.cellNames:
-                return CellTo(base, path, to, self.pos)
+                return CellTo(base, path, to_, self.pos)
             elif base in state.poolNames:
-                return PoolTo(base, path, to, self.pairs.values()[0].asExpr(state), self.pos)
+                return PoolTo(base, path, to_, self.pairs.values()[0].asExpr(state), self.pos)
             else:
-                return AttrTo(Ref(base, self.pos), path, to, self.pos)
+                return AttrTo(Ref(base, self.pos), path, to_, self.pos)
 
         elif self.qualifier is None and len(self.pairs) == 1:
-            (name, to), = self.pairs.items()
-            
-            to = to.asExpr(state)
-            if isinstance(to, FcnRef):
-                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to.name, to.pos))
-            elif isinstance(to, FcnDef):
-                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to, to.pos))
+            (name, to_), = self.pairs.items()
+
+            to_ = to_.asExpr(state)
+            if isinstance(to_, FcnRef):
+                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to_.name, to_.pos))
+            elif isinstance(to_, FcnDef):
+                raise PrettyPfaException("direct assignments (with an = sign) cannot refer to functions, such as {0} at {1}".format(to_, to_.pos))
 
             if name in state.cellNames:
-                return CellTo(name, [], to, self.pos)
+                return CellTo(name, [], to_, self.pos)
             elif name in state.poolNames:
-                return PoolTo(name, [], to, self.pairs.values()[0].asExpr(state), self.pos)
+                return PoolTo(name, [], to_, self.pairs.values()[0].asExpr(state), self.pos)
             else:
-                return SetVar({name: to}, self.pos)
-            
+                return SetVar({name: to_}, self.pos)
+
         if any("." in x for x in self.pairs.keys()):
             raise PrettyPfaException("cannot assign multiple deep objects (name contains dots) at the same time; separate with semicolons, rather than commas, at {0}".format(self.pos))
 
@@ -1210,13 +1210,13 @@ class Parser(object):
         """
 
         tokens = ["NUMBER", "STRING", "RAWSTRING", "REPLACEMENT", "DOTNAME",
-                  "LPAREN", "RPAREN", "LBRACKET", "RBRACKET", "LCURLY", "RCURLY", "RARROW", 
+                  "LPAREN", "RPAREN", "LBRACKET", "RBRACKET", "LCURLY", "RCURLY", "RARROW",
                   "PLUS", "MINUS", "TIMES", "FDIV", "MOD", "REM", "POW", "EQ", "NE", "LT", "LE", "GT", "GE", "AND", "OR", "XOR", "NOT", "BITAND", "BITOR", "BITXOR", "BITNOT"]
 
         if self.wholeDocument:
             tokens.append("SECTION_HEADER_START")
             tokens.append("SECTION_HEADER")
-                  
+
         reserved = {"idiv": "IDIV",
                     "fcn": "FCN",
                     "if": "IF",
@@ -1232,7 +1232,7 @@ class Parser(object):
                     "unpack": "UNPACK",
                     "try": "TRY",
                     "var": "VAR",
-                    "to": "TO",
+                    "to_": "TO_",
                     "init": "INIT"}
         tokens += reserved.values()
 
@@ -1535,7 +1535,7 @@ class Parser(object):
                 else:
                     p[0] = EngineConfig(_name, _method, _input, _output, _begin, _action, _end, _fcns, _zero, _merge, _cells, _pools, _randseed, _doc, _version, _metadata, _options, "PrettyPFA document")
                     state.avroTypeBuilder.resolveTypes()
-                    
+
             def p_section(p):
                 r'''section : SECTION_HEADER_START anything
                             | SECTION_HEADER anything'''
@@ -2042,8 +2042,8 @@ class Parser(object):
 
         def p_deepassignment_1(p):
             r'''expression : DOTNAME LBRACKET arguments RBRACKET "=" expression
-                           | DOTNAME LBRACKET arguments RBRACKET TO argument
-                           | DOTNAME LBRACKET arguments RBRACKET TO argument INIT expression'''
+                           | DOTNAME LBRACKET arguments RBRACKET TO_ argument
+                           | DOTNAME LBRACKET arguments RBRACKET TO_ argument INIT expression'''
             if len(p) > 7:
                 init = p[8]
                 high = p[8].high
@@ -2053,8 +2053,8 @@ class Parser(object):
             p[0] = MiniTo(p[1].v, p[3], (p[5] == "="), p[6], init, p[1].lineno, high)
 
         def p_deepassignment_2(p):
-            r'''expression : DOTNAME TO argument
-                           | DOTNAME TO argument INIT expression'''
+            r'''expression : DOTNAME TO_ argument
+                           | DOTNAME TO_ argument INIT expression'''
             if len(p) > 4:
                 init = p[5]
                 high = p[5].high
